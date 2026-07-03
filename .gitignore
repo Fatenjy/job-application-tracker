@@ -12,3 +12,5 @@ htmlcov/
 .idea/
 postgres_data/
 uvicorn.log
+docs/generate_guide.py
+docs/*.pdf
