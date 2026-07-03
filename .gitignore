@@ -11,3 +11,4 @@ htmlcov/
 .vscode/
 .idea/
 postgres_data/
+uvicorn.log
