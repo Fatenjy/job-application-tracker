@@ -20,6 +20,22 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
+    # Email notifications via SMTP (e.g. Gmail: smtp.gmail.com + app password)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    notify_email_to: str = ""
+
+    # Comma-separated keywords; a new job is notified if its title or tags
+    # contain at least one of them. Empty = notify nothing.
+    match_keywords: str = ""
+    scrape_interval_hours: int = 6
+
+    @property
+    def keywords_list(self) -> list[str]:
+        return [k.strip().lower() for k in self.match_keywords.split(",") if k.strip()]
+
     @property
     def database_url(self) -> str:
         return (

@@ -1,14 +1,28 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.routers import applications, jobs
+from app.services.scheduler import start_scheduler, stop_scheduler
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Runs at startup / shutdown of the API: the scheduler lives and dies
+    # with the web process.
+    start_scheduler()
+    yield
+    stop_scheduler()
+
 
 app = FastAPI(
     title="Job Application Tracker",
     description="Tracks job listings from public APIs and notifies new matches.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(jobs.router)
