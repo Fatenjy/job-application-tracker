@@ -3,12 +3,16 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.routers import applications, jobs
 
 app = FastAPI(
     title="Job Application Tracker",
     description="Tracks job listings from public APIs and notifies new matches.",
     version="0.1.0",
 )
+
+app.include_router(jobs.router)
+app.include_router(applications.router)
 
 
 @app.get("/health", tags=["monitoring"])
