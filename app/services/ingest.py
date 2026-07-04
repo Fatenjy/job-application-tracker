@@ -9,6 +9,7 @@ from app.schemas.job import JobCreate
 from app.scrapers.arbeitnow import ArbeitnowScraper
 from app.scrapers.base import JobSource
 from app.scrapers.remoteok import RemoteOKScraper
+from app.scrapers.remotive import RemotiveScraper
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 # or corporate proxy (their root certificate lives in the OS store only).
 truststore.inject_into_ssl()
 
-SCRAPERS: list[JobSource] = [RemoteOKScraper(), ArbeitnowScraper()]
+SCRAPERS: list[JobSource] = [RemoteOKScraper(), ArbeitnowScraper(), RemotiveScraper()]
 
 
 def ingest_jobs(db: Session, jobs: list[JobCreate]) -> int:
