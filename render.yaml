@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: job-application-tracker
+    runtime: python
+    plan: free
+    buildCommand: pip install -e .
+    # Migrations run before the API starts: the schema is always current.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: DATABASE_URL
+        sync: false
+      - key: MATCH_KEYWORDS
+        value: python,junior,data
+      - key: SCRAPE_INTERVAL_HOURS
+        value: "6"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: NOTIFY_EMAIL_TO
+        sync: false

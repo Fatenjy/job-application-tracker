@@ -67,7 +67,7 @@ def scrape_all(db: Session) -> dict[str, int | None]:
         new_jobs = list(db.scalars(select(Job).where(Job.id.in_(all_new_ids))))
         notified = notify_new_jobs(new_jobs)
         if notified:
-            logger.info("notified %d matching new jobs via telegram", notified)
+            logger.info("notified %d matching new jobs", notified)
     return new_by_source
 
 
