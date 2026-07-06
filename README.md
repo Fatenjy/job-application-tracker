@@ -1,5 +1,7 @@
 # Job Application Tracker
 
+[![CI](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml)
+
 A job-hunting assistant that **scrapes job listings from public APIs, stores them in PostgreSQL, filters them against your keywords, and emails you the new matches** — with a REST API to browse offers and track your applications from `saved` to `offer`.
 
 Built as a first portfolio project with a deliberately production-grade stack: FastAPI, SQLAlchemy 2.0, Alembic migrations, Docker, APScheduler, pytest, and GitHub Actions CI.

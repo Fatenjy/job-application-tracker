@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,9 +12,13 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    postgres_user: str
-    postgres_password: str
-    postgres_db: str
+    # Cloud platforms (Render, Railway...) provide one ready-made connection
+    # URL instead of separate credentials. When set, it wins over POSTGRES_*.
+    database_url_env: str = Field("", alias="DATABASE_URL")
+
+    postgres_user: str = ""
+    postgres_password: str = ""
+    postgres_db: str = ""
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
@@ -38,6 +43,14 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_env:
+            # Normalize the scheme so SQLAlchemy picks the psycopg driver
+            # (cloud platforms hand out postgres:// or postgresql:// URLs).
+            url = self.database_url_env
+            for prefix in ("postgres://", "postgresql://"):
+                if url.startswith(prefix):
+                    return url.replace(prefix, "postgresql+psycopg://", 1)
+            return url
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
