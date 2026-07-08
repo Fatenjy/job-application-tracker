@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml)
 
+**Live demo:** [job-application-tracker-ws8w.onrender.com/docs](https://job-application-tracker-ws8w.onrender.com/docs) *(free tier — first request may take ~1 min to wake the service)*
+
 A job-hunting assistant that **scrapes job listings from public APIs, stores them in PostgreSQL, filters them against your keywords, and emails you the new matches** — with a REST API to browse offers and track your applications from `saved` to `offer`.
 
 Built as a first portfolio project with a deliberately production-grade stack: FastAPI, SQLAlchemy 2.0, Alembic migrations, Docker, APScheduler, pytest, and GitHub Actions CI.
@@ -110,7 +112,7 @@ notifications need no changes.
 
 ## Roadmap
 
-- [ ] Public deployment with a live demo
+- [x] Public deployment with a live demo (Render + Neon PostgreSQL)
 - [ ] Small HTML dashboard on top of the API
 - [ ] More sources (The Muse, Jobicy, WeWorkRemotely)
 - [ ] Celery + Redis for distributed scraping (v2)
