@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,12 @@ app = FastAPI(
 
 app.include_router(jobs.router)
 app.include_router(applications.router)
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Visitors landing on the bare domain go straight to the API docs."""
+    return RedirectResponse("/docs")
 
 
 @app.get("/health", tags=["monitoring"])
