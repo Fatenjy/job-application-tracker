@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Fatenjy/job-application-tracker/actions/workflows/ci.yml)
 
-**Live demo:** [job-application-tracker-ws8w.onrender.com/docs](https://job-application-tracker-ws8w.onrender.com/docs) *(free tier — first request may take ~1 min to wake the service)*
+**Live demo:** [job-application-tracker-ws8w.onrender.com](https://job-application-tracker-ws8w.onrender.com) — Kanban dashboard + [API docs](https://job-application-tracker-ws8w.onrender.com/docs) *(free tier — first request may take ~1 min to wake the service)*
 
 A job-hunting assistant that **scrapes job listings from public APIs, stores them in PostgreSQL, filters them against your keywords, and emails you the new matches** — with a REST API to browse offers and track your applications from `saved` to `offer`.
 
@@ -24,6 +24,7 @@ Built as a first portfolio project with a deliberately production-grade stack: F
 - **Ingestion is idempotent**: a unique `(source, external_id)` constraint plus `ON CONFLICT DO NOTHING ... RETURNING` means re-scraping never duplicates and new jobs are detected exactly.
 - **Notifications**: new jobs matching `MATCH_KEYWORDS` are emailed (SMTP) and/or sent via Telegram — whichever is configured.
 - **Application tracking**: one application per job, status workflow `saved → applied → interview → offer/rejected`.
+- **Dashboard**: a dependency-free HTML/CSS/JS Kanban board served by the same FastAPI app — drag cards between status columns, search listings, keep notes per application.
 
 ## Tech stack
 
@@ -113,6 +114,6 @@ notifications need no changes.
 ## Roadmap
 
 - [x] Public deployment with a live demo (Render + Neon PostgreSQL)
-- [ ] Small HTML dashboard on top of the API
+- [x] Kanban dashboard on top of the API (vanilla JS, drag & drop)
 - [ ] More sources (The Muse, Jobicy, WeWorkRemotely)
 - [ ] Celery + Redis for distributed scraping (v2)

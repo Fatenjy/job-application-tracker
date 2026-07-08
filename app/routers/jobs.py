@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import Text, cast, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -23,7 +23,15 @@ def list_jobs(
     stmt = select(Job).order_by(Job.posted_at.desc().nulls_last(), Job.id.desc())
     if q:
         pattern = f"%{q}%"
-        stmt = stmt.where(or_(Job.title.ilike(pattern), Job.company.ilike(pattern)))
+        # Tags matter as much as titles: a "Backend Engineer" job tagged
+        # "python" must match q=python (titles rarely name the language).
+        stmt = stmt.where(
+            or_(
+                Job.title.ilike(pattern),
+                Job.company.ilike(pattern),
+                cast(Job.tags, Text).ilike(pattern),
+            )
+        )
     if tag:
         # JSONB containment: does the tags array contain this value?
         stmt = stmt.where(Job.tags.contains([tag]))

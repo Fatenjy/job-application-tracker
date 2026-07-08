@@ -35,15 +35,17 @@ def test_list_jobs_filters(client, db):
     make_job(db, external_id="a", title="Junior Python Developer", remote=True)
     make_job(db, external_id="b", title="Senior Java Engineer", remote=False, tags=["java"])
 
-    assert len(client.get("/jobs").json()) == 2
-    # text search on title
-    assert len(client.get("/jobs", params={"q": "python"}).json()) == 1
+    make_job(db, external_id="c", title="Backend Engineer", tags=["python", "aws"])
+
+    assert len(client.get("/jobs").json()) == 3
+    # text search covers title AND tags: "Backend Engineer" is tagged python
+    assert len(client.get("/jobs", params={"q": "python"}).json()) == 2
     # remote filter
     assert len(client.get("/jobs", params={"remote": False}).json()) == 1
-    # JSONB tag containment
-    assert len(client.get("/jobs", params={"tag": "python"}).json()) == 1
+    # JSONB tag containment (exact tag)
+    assert len(client.get("/jobs", params={"tag": "python"}).json()) == 2
     # combination with no possible match
-    assert client.get("/jobs", params={"q": "python", "remote": False}).json() == []
+    assert client.get("/jobs", params={"q": "java", "remote": True}).json() == []
 
 
 def test_get_job_404(client):

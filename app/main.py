@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -30,10 +32,19 @@ app.include_router(jobs.router)
 app.include_router(applications.router)
 
 
+# The dashboard: plain HTML/CSS/JS served as static files, talking to the
+# API endpoints below from the browser.
+app.mount(
+    "/dashboard",
+    StaticFiles(directory=Path(__file__).parent / "static", html=True),
+    name="dashboard",
+)
+
+
 @app.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
-    """Visitors landing on the bare domain go straight to the API docs."""
-    return RedirectResponse("/docs")
+    """Visitors landing on the bare domain go straight to the dashboard."""
+    return RedirectResponse("/dashboard/")
 
 
 @app.get("/health", tags=["monitoring"])

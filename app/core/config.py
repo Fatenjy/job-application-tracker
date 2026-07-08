@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -10,7 +14,8 @@ class Settings(BaseSettings):
     crashing later at first use.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Anchored to the project root so the app finds .env from any cwd.
+    model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env", extra="ignore")
 
     # Cloud platforms (Render, Railway...) provide one ready-made connection
     # URL instead of separate credentials. When set, it wins over POSTGRES_*.
