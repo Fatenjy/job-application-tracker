@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.routers import applications, jobs
+from app.routers import applications, auth, jobs
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 
@@ -28,6 +28,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(applications.router)
 

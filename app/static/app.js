@@ -1,47 +1,65 @@
 "use strict";
 
-/* ---------- API client: thin wrappers over our FastAPI endpoints ---------- */
+/* ---------- Auth token storage ---------- */
+const TOKEN_KEY = "jobtracker_token";
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+/* ---------- API client ---------- */
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+}
+
 const api = {
+  async register(email, password) {
+    return fetch("/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+  },
+  async login(email, password) {
+    // OAuth2 password flow expects form-encoded fields; "username" = email.
+    const body = new URLSearchParams({ username: email, password });
+    return fetch("/auth/token", { method: "POST", body });
+  },
+  async me() {
+    return fetch("/auth/me", { headers: authHeaders() });
+  },
   async jobs(params) {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v !== "" && v !== null))
     );
-    const res = await fetch(`/jobs?${qs}`);
-    return res.json();
+    return (await fetch(`/jobs?${qs}`)).json();
   },
   async applications() {
-    const res = await fetch("/applications");
-    return res.json();
+    return (await fetch("/applications", { headers: authHeaders() })).json();
   },
   async createApplication(jobId) {
     return fetch("/applications", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ job_id: jobId }),
     });
   },
   async updateApplication(id, data) {
     return fetch(`/applications/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(data),
     });
   },
   async deleteApplication(id) {
-    return fetch(`/applications/${id}`, { method: "DELETE" });
+    return fetch(`/applications/${id}`, { method: "DELETE", headers: authHeaders() });
   },
 };
 
-const STATUSES = [
-  { key: "saved", label: "Saved" },
-  { key: "applied", label: "Applied" },
-  { key: "interview", label: "Interview" },
-  { key: "offer", label: "Offer" },
-  { key: "rejected", label: "Rejected" },
-];
-
+const STATUSES = ["saved", "applied", "interview", "offer", "rejected"];
 let applicationsCache = [];
 let panelApplicationId = null;
+let authMode = "login"; // or "signup"
 
 /* ---------- Helpers ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -56,13 +74,101 @@ function toast(message) {
 
 function fmtDate(iso) {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  return new Date(iso).toLocaleDateString(currentLang === "fr" ? "fr-FR" : "en-GB", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 function esc(s) {
   const div = document.createElement("div");
   div.textContent = s ?? "";
   return div.innerHTML;
+}
+
+/* ---------- View routing ---------- */
+function showView(view) {
+  ["landing", "auth", "board", "jobs"].forEach((v) =>
+    $(`#view-${v}`).classList.toggle("hidden", v !== view)
+  );
+  const loggedIn = view === "board" || view === "jobs";
+  $("#topbar-public").classList.toggle("hidden", loggedIn);
+  $("#topbar-app").classList.toggle("hidden", !loggedIn);
+  if (view === "board") {
+    document.querySelectorAll(".tab").forEach((t) =>
+      t.classList.toggle("active", t.dataset.view === "board")
+    );
+    renderBoard();
+  } else if (view === "jobs") {
+    document.querySelectorAll(".tab").forEach((t) =>
+      t.classList.toggle("active", t.dataset.view === "jobs")
+    );
+    renderJobSearch();
+  }
+}
+
+/* ---------- Auth views ---------- */
+function openAuth(mode) {
+  authMode = mode;
+  $("#auth-error").classList.add("hidden");
+  $("#auth-form").reset();
+  const isLogin = mode === "login";
+  $("#auth-title").textContent = t(isLogin ? "auth.login_title" : "auth.signup_title");
+  $("#auth-submit").textContent = t(isLogin ? "auth.login_btn" : "auth.signup_btn");
+  $("#auth-password").autocomplete = isLogin ? "current-password" : "new-password";
+  $("#auth-switch-text").textContent = t(isLogin ? "auth.no_account" : "auth.have_account");
+  $("#auth-switch-link").textContent = t(isLogin ? "auth.switch_signup" : "auth.switch_login");
+  showView("auth");
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const email = $("#auth-email").value.trim();
+  const password = $("#auth-password").value;
+  const errEl = $("#auth-error");
+  errEl.classList.add("hidden");
+
+  try {
+    let res;
+    if (authMode === "signup") {
+      res = await api.register(email, password);
+      if (res.status === 409) return showAuthError(t("error.email_taken"));
+      if (!res.ok) return showAuthError(t("error.generic"));
+      setToken((await res.json()).access_token);
+    } else {
+      res = await api.login(email, password);
+      if (res.status === 401) return showAuthError(t("error.bad_login"));
+      if (!res.ok) return showAuthError(t("error.generic"));
+      setToken((await res.json()).access_token);
+    }
+    await enterApp();
+  } catch {
+    showAuthError(t("error.generic"));
+  }
+}
+
+function showAuthError(message) {
+  const errEl = $("#auth-error");
+  errEl.textContent = message;
+  errEl.classList.remove("hidden");
+}
+
+async function enterApp() {
+  const res = await api.me();
+  if (!res.ok) {
+    clearToken();
+    return showView("landing");
+  }
+  const user = await res.json();
+  $("#user-email").textContent = user.email;
+  applicationsCache = await api.applications();
+  showView("board");
+}
+
+function logout() {
+  clearToken();
+  applicationsCache = [];
+  showView("landing");
 }
 
 /* ---------- Board (Kanban) ---------- */
@@ -72,13 +178,13 @@ async function renderBoard() {
   board.innerHTML = "";
 
   for (const status of STATUSES) {
-    const apps = applicationsCache.filter((a) => a.status === status.key);
+    const apps = applicationsCache.filter((a) => a.status === status);
     const column = document.createElement("div");
     column.className = "column";
-    column.dataset.status = status.key;
+    column.dataset.status = status;
     column.innerHTML = `
-      <div class="column-head">${status.label} <span class="count">${apps.length}</span></div>
-      ${apps.length === 0 ? '<div class="empty">Drop a card here</div>' : ""}
+      <div class="column-head">${t("status." + status)} <span class="count">${apps.length}</span></div>
+      ${apps.length === 0 ? `<div class="empty">${t("board.drop")}</div>` : ""}
     `;
 
     for (const app of apps) {
@@ -95,9 +201,7 @@ async function renderBoard() {
         </div>
       `;
       card.addEventListener("click", () => openPanel(app.id));
-      card.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", String(app.id));
-      });
+      card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", String(app.id)));
       column.appendChild(card);
     }
 
@@ -110,10 +214,9 @@ async function renderBoard() {
       e.preventDefault();
       column.classList.remove("dragover");
       const id = Number(e.dataTransfer.getData("text/plain"));
-      const newStatus = column.dataset.status;
-      const res = await api.updateApplication(id, { status: newStatus });
+      const res = await api.updateApplication(id, { status: column.dataset.status });
       if (res.ok) {
-        toast(`Moved to ${newStatus}`);
+        toast(`${t("toast.moved")} ${t("status." + column.dataset.status)}`);
         renderBoard();
       }
     });
@@ -147,17 +250,17 @@ async function savePanel() {
     notes: $("#panel-notes").value || null,
   });
   if (res.ok) {
-    toast("Saved");
+    toast(t("toast.saved"));
     closePanel();
     renderBoard();
   }
 }
 
 async function deleteFromPanel() {
-  if (!confirm("Stop tracking this application?")) return;
+  if (!confirm(t("confirm.delete"))) return;
   const res = await api.deleteApplication(panelApplicationId);
   if (res.ok || res.status === 204) {
-    toast("Deleted");
+    toast(t("toast.deleted"));
     closePanel();
     renderBoard();
   }
@@ -167,7 +270,7 @@ async function deleteFromPanel() {
 async function renderJobSearch(event) {
   if (event) event.preventDefault();
   const results = $("#job-results");
-  results.innerHTML = '<div class="empty">Searching...</div>';
+  results.innerHTML = `<div class="empty">${t("search.searching")}</div>`;
 
   const jobs = await api.jobs({
     q: $("#search-q").value,
@@ -177,7 +280,7 @@ async function renderJobSearch(event) {
   });
 
   const trackedJobIds = new Set(applicationsCache.map((a) => a.job.id));
-  results.innerHTML = jobs.length === 0 ? '<div class="empty">No jobs match.</div>' : "";
+  results.innerHTML = jobs.length === 0 ? `<div class="empty">${t("search.no_results")}</div>` : "";
 
   for (const job of jobs) {
     const row = document.createElement("div");
@@ -190,44 +293,55 @@ async function renderJobSearch(event) {
           · ${esc(job.source)}${job.remote ? " · remote" : ""}</div>
       </div>
       <button class="btn ${already ? "saved" : ""}" ${already ? "disabled" : ""}>
-        ${already ? "Saved ✓" : "Save"}
+        ${already ? t("search.saved") : t("search.save")}
       </button>
     `;
     const btn = row.querySelector("button");
     btn.addEventListener("click", async () => {
       const res = await api.createApplication(job.id);
       if (res.ok) {
-        btn.textContent = "Saved ✓";
+        btn.textContent = t("search.saved");
         btn.classList.add("saved");
         btn.disabled = true;
-        toast("Added to your board");
+        toast(t("toast.added"));
         applicationsCache = await api.applications();
       } else if (res.status === 409) {
-        toast("Already on your board");
+        toast(t("toast.already"));
       }
     });
     results.appendChild(row);
   }
 }
 
-/* ---------- Tabs ---------- */
-function switchView(view) {
-  document.querySelectorAll(".tab").forEach((t) =>
-    t.classList.toggle("active", t.dataset.view === view)
-  );
-  $("#view-board").classList.toggle("hidden", view !== "board");
-  $("#view-jobs").classList.toggle("hidden", view !== "jobs");
-  if (view === "board") renderBoard();
-  else renderJobSearch();
-}
-
 /* ---------- Wiring ---------- */
-document.querySelectorAll(".tab").forEach((tab) =>
-  tab.addEventListener("click", () => switchView(tab.dataset.view))
+document.querySelectorAll("[data-nav]").forEach((btn) =>
+  btn.addEventListener("click", () => openAuth(btn.dataset.nav))
 );
+document.querySelectorAll(".tab").forEach((tab) =>
+  tab.addEventListener("click", () => showView(tab.dataset.view))
+);
+$("#auth-form").addEventListener("submit", submitAuth);
+$("#auth-switch-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  openAuth(authMode === "login" ? "signup" : "login");
+});
+$("#logout-btn").addEventListener("click", logout);
 $("#search-form").addEventListener("submit", renderJobSearch);
 $("#panel-close").addEventListener("click", closePanel);
 $("#panel-save").addEventListener("click", savePanel);
 $("#panel-delete").addEventListener("click", deleteFromPanel);
 
-renderBoard();
+// Re-render the active board/search when the language changes.
+document.addEventListener("langchange", () => {
+  if (!$("#view-board").classList.contains("hidden")) renderBoard();
+  else if (!$("#view-jobs").classList.contains("hidden")) renderJobSearch();
+});
+
+/* ---------- Boot ---------- */
+document.querySelectorAll("[data-lang-switch]").forEach(renderLangSwitch);
+applyTranslations();
+if (getToken()) {
+  enterApp();
+} else {
+  showView("landing");
+}

@@ -3,40 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Job Application Tracker</title>
+  <title>JobTracker</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
+  <!-- ===== Public top bar (landing / auth) ===== -->
+  <header class="topbar" id="topbar-public">
+    <div class="brand">Job<span>Tracker</span></div>
+    <div class="spacer"></div>
+    <div class="lang-switch" data-lang-switch></div>
+    <button class="btn ghost" data-nav="login" data-i18n="nav.login">Log in</button>
+    <button class="btn primary" data-nav="signup" data-i18n="nav.signup">Sign up</button>
+  </header>
+
+  <!-- ===== App top bar (after login) ===== -->
+  <header class="topbar hidden" id="topbar-app">
     <div class="brand">Job<span>Tracker</span></div>
     <nav class="tabs">
-      <button class="tab active" data-view="board">Board</button>
-      <button class="tab" data-view="jobs">Find jobs</button>
+      <button class="tab active" data-view="board" data-i18n="nav.board">Board</button>
+      <button class="tab" data-view="jobs" data-i18n="nav.find">Find jobs</button>
     </nav>
-    <a class="api-link" href="/docs" title="API documentation">API</a>
+    <div class="spacer"></div>
+    <div class="lang-switch" data-lang-switch></div>
+    <span class="user-email" id="user-email"></span>
+    <button class="btn ghost" id="logout-btn" data-i18n="nav.logout">Log out</button>
   </header>
 
   <main>
-    <section id="view-board" class="view">
+    <!-- ===== Landing ===== -->
+    <section id="view-landing" class="view">
+      <div class="hero">
+        <h1 data-i18n="hero.title">Track every job application in one place.</h1>
+        <p class="lead" data-i18n="hero.subtitle">
+          Search fresh remote listings, save the ones you like, and move them
+          from saved to offer on a simple board. Free and open source.
+        </p>
+        <div class="hero-cta">
+          <button class="btn primary big" data-nav="signup" data-i18n="hero.cta_signup">Get started — it's free</button>
+          <button class="btn ghost big" data-nav="login" data-i18n="hero.cta_login">I already have an account</button>
+        </div>
+        <div class="features">
+          <div class="feature">
+            <div class="feature-icon">🔎</div>
+            <h3 data-i18n="feature.search.title">Fresh listings</h3>
+            <p data-i18n="feature.search.body">Jobs pulled automatically from public job boards, updated daily.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🗂️</div>
+            <h3 data-i18n="feature.board.title">Kanban board</h3>
+            <p data-i18n="feature.board.body">Drag applications across saved, applied, interview and offer.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔔</div>
+            <h3 data-i18n="feature.alerts.title">Email alerts</h3>
+            <p data-i18n="feature.alerts.body">Get notified when new jobs match your keywords.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Auth (login + signup share one card) ===== -->
+    <section id="view-auth" class="view hidden">
+      <form class="auth-card" id="auth-form">
+        <h2 id="auth-title" data-i18n="auth.login_title">Welcome back</h2>
+        <p class="auth-error hidden" id="auth-error"></p>
+        <label data-i18n="auth.email">Email
+          <input type="email" id="auth-email" required autocomplete="email" />
+        </label>
+        <label data-i18n="auth.password">Password
+          <input type="password" id="auth-password" required minlength="8" autocomplete="current-password" />
+        </label>
+        <button type="submit" class="btn primary" id="auth-submit" data-i18n="auth.login_btn">Log in</button>
+        <p class="auth-switch">
+          <span id="auth-switch-text" data-i18n="auth.no_account">Don't have an account?</span>
+          <a href="#" id="auth-switch-link" data-i18n="auth.switch_signup">Sign up</a>
+        </p>
+      </form>
+    </section>
+
+    <!-- ===== Board ===== -->
+    <section id="view-board" class="view hidden">
       <div class="board" id="board"></div>
     </section>
 
+    <!-- ===== Job search ===== -->
     <section id="view-jobs" class="view hidden">
       <form id="search-form" class="search-bar">
-        <input type="search" id="search-q" placeholder="Search title or company (e.g. python)..." />
+        <input type="search" id="search-q" data-i18n-attr="placeholder:search.placeholder"
+               placeholder="Search title, company or tag (e.g. python)..." />
         <select id="search-source">
-          <option value="">All sources</option>
+          <option value="" data-i18n="search.all_sources">All sources</option>
           <option value="remoteok">RemoteOK</option>
           <option value="arbeitnow">Arbeitnow</option>
           <option value="remotive">Remotive</option>
         </select>
-        <label class="check"><input type="checkbox" id="search-remote" /> Remote only</label>
-        <button type="submit" class="btn primary">Search</button>
+        <label class="check"><input type="checkbox" id="search-remote" /> <span data-i18n="search.remote_only">Remote only</span></label>
+        <button type="submit" class="btn primary" data-i18n="search.button">Search</button>
       </form>
       <div id="job-results" class="job-list"></div>
     </section>
   </main>
 
+  <!-- ===== Detail panel ===== -->
   <aside id="panel" class="panel hidden">
     <div class="panel-head">
       <div>
@@ -46,27 +114,29 @@
       <button id="panel-close" class="btn ghost" aria-label="Close">✕</button>
     </div>
     <div class="panel-body">
-      <label>Status
+      <label data-i18n="panel.status">Status
         <select id="panel-status">
-          <option value="saved">Saved</option>
-          <option value="applied">Applied</option>
-          <option value="interview">Interview</option>
-          <option value="offer">Offer</option>
-          <option value="rejected">Rejected</option>
+          <option value="saved" data-i18n="status.saved">Saved</option>
+          <option value="applied" data-i18n="status.applied">Applied</option>
+          <option value="interview" data-i18n="status.interview">Interview</option>
+          <option value="offer" data-i18n="status.offer">Offer</option>
+          <option value="rejected" data-i18n="status.rejected">Rejected</option>
         </select>
       </label>
-      <label>Notes
-        <textarea id="panel-notes" rows="6" placeholder="Contacts, salary discussed, next steps..."></textarea>
+      <label data-i18n="panel.notes">Notes
+        <textarea id="panel-notes" rows="6" data-i18n-attr="placeholder:panel.notes_ph"
+                  placeholder="Contacts, salary discussed, next steps..."></textarea>
       </label>
-      <a id="panel-url" class="btn ghost" target="_blank" rel="noopener">Open job posting ↗</a>
+      <a id="panel-url" class="btn ghost" target="_blank" rel="noopener" data-i18n="panel.open">Open job posting ↗</a>
       <div class="panel-actions">
-        <button id="panel-delete" class="btn danger">Delete</button>
-        <button id="panel-save" class="btn primary">Save</button>
+        <button id="panel-delete" class="btn danger" data-i18n="panel.delete">Delete</button>
+        <button id="panel-save" class="btn primary" data-i18n="panel.save">Save</button>
       </div>
     </div>
   </aside>
 
   <div id="toast" class="toast hidden"></div>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

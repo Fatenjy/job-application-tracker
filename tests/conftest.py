@@ -55,7 +55,7 @@ def clean_tables():
     """Every test starts from an empty, predictable state."""
     yield
     with test_engine.begin() as conn:
-        conn.execute(text("TRUNCATE applications, jobs RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE applications, jobs, users RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture()
@@ -79,3 +79,22 @@ def client(db):
     # the scheduler stays off during tests.
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+def _register(client: TestClient, email: str, password: str = "password123") -> str:
+    """Register a user and return an Authorization header value."""
+    res = client.post("/auth/register", json={"email": email, "password": password})
+    assert res.status_code == 201, res.text
+    return f"Bearer {res.json()['access_token']}"
+
+
+@pytest.fixture()
+def auth(client):
+    """A registered user's bearer token header: {'Authorization': 'Bearer ...'}."""
+    return {"Authorization": _register(client, "user@test.com")}
+
+
+@pytest.fixture()
+def other_auth(client):
+    """A second, different user — for per-user isolation tests."""
+    return {"Authorization": _register(client, "other@test.com")}

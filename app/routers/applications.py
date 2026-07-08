@@ -2,23 +2,45 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models import Application, Job
+from app.models import Application, Job, User
 from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationUpdate
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
 
+def _get_owned(application_id: int, user: User, db: Session) -> Application:
+    """Fetch an application only if it belongs to the current user.
+
+    Returning 404 (not 403) for someone else's application avoids leaking
+    whether that id exists at all.
+    """
+    application = db.get(Application, application_id)
+    if application is None or application.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return application
+
+
 @router.post("", response_model=ApplicationRead, status_code=201)
-def create_application(payload: ApplicationCreate, db: Session = Depends(get_db)) -> Application:
+def create_application(
+    payload: ApplicationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Application:
     """Start tracking an application for a job listing."""
     if db.get(Job, payload.job_id) is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    existing = db.scalar(select(Application).where(Application.job_id == payload.job_id))
+    existing = db.scalar(
+        select(Application).where(
+            Application.user_id == current_user.id,
+            Application.job_id == payload.job_id,
+        )
+    )
     if existing is not None:
         # 409 Conflict: the request is valid but collides with current state.
         raise HTTPException(status_code=409, detail="Application already exists for this job")
-    application = Application(**payload.model_dump())
+    application = Application(user_id=current_user.id, **payload.model_dump())
     db.add(application)
     db.commit()
     db.refresh(application)
@@ -26,11 +48,15 @@ def create_application(payload: ApplicationCreate, db: Session = Depends(get_db)
 
 
 @router.get("", response_model=list[ApplicationRead])
-def list_applications(db: Session = Depends(get_db)) -> list[Application]:
+def list_applications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Application]:
     # joinedload fetches each application WITH its job in a single SQL query,
     # instead of one extra query per row (the classic "N+1" performance trap).
     stmt = (
         select(Application)
+        .where(Application.user_id == current_user.id)
         .options(joinedload(Application.job))
         .order_by(Application.updated_at.desc())
     )
@@ -39,11 +65,12 @@ def list_applications(db: Session = Depends(get_db)) -> list[Application]:
 
 @router.patch("/{application_id}", response_model=ApplicationRead)
 def update_application(
-    application_id: int, payload: ApplicationUpdate, db: Session = Depends(get_db)
+    application_id: int,
+    payload: ApplicationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Application:
-    application = db.get(Application, application_id)
-    if application is None:
-        raise HTTPException(status_code=404, detail="Application not found")
+    application = _get_owned(application_id, current_user, db)
     # exclude_unset: only touch the fields the client actually sent.
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(application, field, value)
@@ -53,10 +80,12 @@ def update_application(
 
 
 @router.delete("/{application_id}", status_code=204)
-def delete_application(application_id: int, db: Session = Depends(get_db)) -> Response:
-    application = db.get(Application, application_id)
-    if application is None:
-        raise HTTPException(status_code=404, detail="Application not found")
+def delete_application(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    application = _get_owned(application_id, current_user, db)
     db.delete(application)
     db.commit()
     return Response(status_code=204)

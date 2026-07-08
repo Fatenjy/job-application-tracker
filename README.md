@@ -24,7 +24,8 @@ Built as a first portfolio project with a deliberately production-grade stack: F
 - **Ingestion is idempotent**: a unique `(source, external_id)` constraint plus `ON CONFLICT DO NOTHING ... RETURNING` means re-scraping never duplicates and new jobs are detected exactly.
 - **Notifications**: new jobs matching `MATCH_KEYWORDS` are emailed (SMTP) and/or sent via Telegram — whichever is configured.
 - **Application tracking**: one application per job, status workflow `saved → applied → interview → offer/rejected`.
-- **Dashboard**: a dependency-free HTML/CSS/JS Kanban board served by the same FastAPI app — drag cards between status columns, search listings, keep notes per application.
+- **Accounts**: email/password registration and login (bcrypt-hashed passwords, JWT bearer tokens). Each user's applications are private to them.
+- **Dashboard**: a dependency-free HTML/CSS/JS single-page app served by the same FastAPI app — public landing page, sign up / log in, a Kanban board with drag & drop, job search, per-application notes, and an English/French language switch.
 
 ## Tech stack
 
@@ -33,9 +34,10 @@ Built as a first portfolio project with a deliberately production-grade stack: F
 | API | FastAPI + Uvicorn | Modern async framework, automatic OpenAPI docs |
 | Database | PostgreSQL 16 (Docker) | The industry-default relational database; JSONB for tags |
 | ORM / migrations | SQLAlchemy 2.0 + Alembic | Typed `Mapped[]` models, versioned reversible migrations |
+| Auth | JWT (PyJWT) + bcrypt | Hashed passwords, OAuth2 password flow, per-user data |
 | Scheduling | APScheduler | In-process interval jobs tied to the FastAPI lifespan |
 | HTTP client | httpx | Modern client used by the scrapers |
-| Quality | pytest, ruff, GitHub Actions | 11 tests against a real PostgreSQL service container |
+| Quality | pytest, ruff, GitHub Actions | 20 tests against a real PostgreSQL service container |
 
 ## Quickstart
 
@@ -88,10 +90,13 @@ All configuration lives in `.env` (never committed — see `.env.example`):
 | Endpoint | Description |
 |---|---|
 | `GET /health` | Liveness check (verifies DB connectivity) |
+| `POST /auth/register` | Create an account, returns a token |
+| `POST /auth/token` | Log in (OAuth2 password flow), returns a token |
+| `GET /auth/me` | The current user |
 | `GET /jobs?q=python&tag=data&remote=true&source=remotive` | Search and filter listings |
 | `GET /jobs/{id}` | One listing |
-| `POST /applications` | Start tracking an application (409 on duplicates) |
-| `GET /applications` | Your applications with the listing embedded |
+| `POST /applications` | Track a job (auth required, 409 on duplicates) |
+| `GET /applications` | Your own applications with the listing embedded |
 | `PATCH /applications/{id}` | Update status/notes (partial update) |
 | `DELETE /applications/{id}` | Stop tracking |
 

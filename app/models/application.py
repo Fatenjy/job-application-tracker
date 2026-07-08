@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -19,13 +19,16 @@ class ApplicationStatus(enum.StrEnum):
 
 
 class Application(Base):
-    """Tracks MY application to one job listing."""
+    """Tracks one user's application to one job listing."""
 
     __tablename__ = "applications"
+    # Each user tracks a given job at most once — but two users can each
+    # track the same job independently.
+    __table_args__ = (UniqueConstraint("user_id", "job_id", name="uq_applications_user_job"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # unique=True: one application per job listing, enforced by the database
-    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
     status: Mapped[ApplicationStatus] = mapped_column(
         # native_enum=False stores the value as a plain VARCHAR + CHECK
         # constraint: adding a status later is a trivial migration, whereas
@@ -45,4 +48,7 @@ class Application(Base):
     job: Mapped[Job] = relationship()
 
     def __repr__(self) -> str:
-        return f"Application(id={self.id}, job_id={self.job_id}, status={self.status})"
+        return (
+            f"Application(id={self.id}, user_id={self.user_id}, "
+            f"job_id={self.job_id}, status={self.status})"
+        )

@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
+    # Signs the JWT auth tokens. MUST be set to a long random value in
+    # production (Render generates one); the dev fallback is fine locally.
+    secret_key: str = "dev-secret-change-me-in-production"
+    access_token_expire_minutes: int = 60 * 24 * 7  # one week
+
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
